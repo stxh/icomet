@@ -1,47 +1,55 @@
 /*
 config = {
-	// sign_url usually link to a app server,
-	// and icomet.admin deny all, but allow app server
-	sign_url: 'http://...',
+	channel: 'abc',
+	// [optional]
+	// sign_url usually link to a app server to get a token,
+	// if icomet do not need athentication, this parameter could be omitted.
+	signUrl: 'http://...',
 	// sub_url link directly to icomet server
-	sub_url: 'http://...',
+	subUrl: 'http://...',
 	// be called when receive a msg
-	sub_callback: function(msg){}
+	callback: function(msg){}
 };
 */
 function iComet(config){
+	var self = this;
 	if(iComet.id__ == undefined){
 		iComet.id__ = 0;
 	}
+	config.sub_url = config.sub_url || config.subUrl;
+	config.sign_url = config.sign_url || config.signUrl;
 	
-	var self = this;
+	self.cname = config.channel;
+	self.sub_cb = config.callback || config.sub_callback;
+	self.sub_timeout = config.sub_timeout || (60 * 1000);
+	
 	self.id = iComet.id__++;
 	self.cb = 'icomet_cb_' + self.id;
-	self.sub_timeout = 60 * 1000;
 	self.timer = null;
 	self.sign_timer = null;
 	self.stopped = true;
 	self.last_sub_time = 0;
 	self.need_fast_reconnect = true;
+	self.token = '';
 
 	self.data_seq = 0;
 	self.noop_seq = 0;
 	self.sign_cb = null;
 	
-	self.cid = config.cid;
-	self.sub_cb = config.sub_callback;
 	if(config.sub_url.indexOf('?') == -1){
 		self.sub_url = config.sub_url + '?';
 	}else{
 		self.sub_url = config.sub_url + '&';
 	}
-	if(config.sign_url.indexOf('?') == -1){
-		self.sign_url = config.sign_url + '?';
-	}else{
-		self.sign_url = config.sign_url + '&';
-	}
 	self.sub_url += 'cb=' + self.cb;
-	self.sign_url += 'cb=' + self.cb;
+	if(config.sign_url){
+		if(config.sign_url.indexOf('?') == -1){
+			self.sign_url = config.sign_url + '?';
+		}else{
+			self.sign_url = config.sign_url + '&';
+		}
+		self.sign_url += 'cb=' + self.cb + '&cname=' + self.cname;
+	}
 
 	window[self.cb] = function(msg, in_batch){
 		// batch repsonse
@@ -68,15 +76,17 @@ function iComet(config){
 		if(msg.type == '404'){
 			self.log('resp', msg);
 			// TODO channel id error!
+			alert('channel not exists!');
 			return;
 		}
 		if(msg.type == '401'){
 			// TODO token error!
 			self.log('resp', msg);
+			alert('token error!');
 			return;
 		}
 		if(msg.type == '429'){
-			// too many connections
+			alert('too many connections');
 			self.log('resp', msg);
 			setTimeout(self_sub, 5000 + Math.random() * 5000);
 			return;
@@ -161,8 +171,11 @@ function iComet(config){
 		self.log('sign in icomet server...');
 		self.sign_cb = callback;
 		var url = self.sign_url + '&_=' + new Date().getTime();
-		var script = '\<script class="' + self.cb + '\" src="' + url + '">\<\/script>';
-		$('body').append(script);
+		$.ajax({
+			url: url,
+			dataType: "jsonp",
+			jsonpCallback: "cb"
+		});
 	}
 
 	var self_sub = function(){
@@ -171,42 +184,51 @@ function iComet(config){
 		self.last_sub_time = (new Date()).getTime();
 		$('script.' + self.cb).remove();
 		var url = self.sub_url
-			 + '&cid=' + self.cid
+			 + '&cname=' + self.cname
 			 + '&seq=' + self.data_seq
 			 + '&noop=' + self.noop_seq
+			 + '&token=' + self.token
 			 + '&_=' + new Date().getTime();
-		var script = '\<script class="' + self.cb + '\" src="' + url + '">\<\/script>';
-		setTimeout(function(){
-			$('body').append(script);
-		}, 0);
+		$.ajax({
+			url: url,
+			dataType: "jsonp",
+			jsonpCallback: "cb"
+		});
 	}
 	
 	self.start = function(){
 		self.stopped = false;
-		self.sign(function(msg){
-			if(self.sign_timer){
-				clearTimeout(self.sign_timer);
-				self.sign_timer = null;
-			}else{
-				return;
-			}
-			if(!self.stopped){
-				self.cid = msg.cid;
-				try{
-					var a = parseInt(msg.sub_timeout) || 0;
-					self.sub_timeout = (a + 10) * 1000;
-				}catch(e){}
-				self.log('start sub ' + self.cid + ', timeout=' + self.sub_timeout + 'ms');
-				self._start_timeout_checker();
-				self_sub();
-			}
-		});
-		if(!self.sign_timer){
-			self.sign_timer = setInterval(self.start, 3000 + Math.random() * 2000);
-		}
 		if(self.timer){
 			clearTimeout(self.timer);
 			self.timer = null;
+		}
+		if(self.sign_url){
+			if(!self.sign_timer){
+				self.sign_timer = setInterval(self.start, 3000 + Math.random() * 2000);
+			}
+			self.sign(function(msg){
+				if(self.sign_timer){
+					clearTimeout(self.sign_timer);
+					self.sign_timer = null;
+				}else{
+					return;
+				}
+				if(!self.stopped){
+					self.cname = msg.cname;
+					self.token = msg.token;
+					try{
+						var a = parseInt(msg.sub_timeout) || 0;
+						self.sub_timeout = (a + 10) * 1000;
+					}catch(e){}
+					self.log('start sub ' + self.cname + ', timeout=' + self.sub_timeout + 'ms');
+					self._start_timeout_checker();
+					self_sub();
+				}
+			});
+		}else{
+			self.log('start sub ' + self.cname + ', timeout=' + self.sub_timeout + 'ms');
+			self._start_timeout_checker();
+			self_sub();
 		}
 	}
 

@@ -2,7 +2,10 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-	<title>icomet chat</title>
+	<meta name="keywords" content="comet, ajax server push, long-polling, comet server, chat" />
+	<meta name="description" content="icomet is a open source C1000K comet server built with libevent, providing full server-push solution of both comet server and js client API." />
+
+	<title>icomet chat demo</title>
 	<style type="text/css">
 	body{
 		margin: 0;
@@ -52,21 +55,38 @@
 function random_str(size){
 	size = size || 20;
 	var time = (new Date().getTime() + '').substr(3);
-	var obj = time + Math.random() + '';
-	return obj.replace('.', '').substr(0, size);
+	var channel = time + Math.random() + '';
+	return channel.replace('.', '').substr(0, size);
 }
 
 var uid = 'u' + (Math.random() + '').replace('.', '').substr(1, 6);
 var nickname = '';
-var app_host = '127.0.0.1:8000';
+
+var app_host = '127.0.0.1:8080';
+var admin_host = '127.0.0.1:8000';
 var icomet_host = '127.0.0.1:8100';
+
+// for testing only
 var n = location.href.match(/http[s]?:\/\/([^\/]*)\//);
 if(n && n.length == 2){
+	app_host = n[1];
 	var ps = n[1].split(':');
-	app_host = ps[0] + ':8000';
+	admin_host = ps[0] + ':8000';
 	icomet_host = ps[0] + ':8100';
 }
 
+var testing = 1;
+if(testing){
+	// This is for test purpose only
+	var sign_url = 'http://' + admin_host + '/sign';
+	var pub_url = 'http://' + admin_host + '/pub?cb=?';
+}else{
+	// In real world business, signUrl/pubUrl should link to an application server
+	// which will do neccessary authentication.
+	var sign_url = 'http://' + app_host + '/icomet/php/sign.php';
+	var pub_url = 'http://' + app_host + '/icomet/php/pub.php?cb=?';
+}
+var sub_url = 'http://' + icomet_host + '/sub';
 
 function join(){
 	nickname = $.trim($('*[name=nickname]').val());
@@ -76,11 +96,12 @@ function join(){
 		return false;
 	}
 	
-	var obj = $('*[name=obj]').val();
+	var channel = $('*[name=channel]').val();
 	var comet = new iComet({
-		sign_url: 'http://' + app_host + '/sign?obj=' + obj,
-		sub_url: 'http://' + icomet_host + '/sub',
-		sub_callback: function(msg){
+		channel: channel,
+		signUrl: sign_url,
+		subUrl: sub_url,
+		callback: function(msg){
 			var msg = JSON.parse(msg.content);
 			var content = msg.content;
 			content = content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -106,13 +127,13 @@ function join(){
 	});
 	$('#login_form').hide();
 	$('#chat_window').show();
-	$('#chat_window h3').html('Channel: ' + obj);
+	$('#chat_window h3').html('Channel: ' + channel);
 	$('#nickname').html(nickname);
 	
 	var url = location.href;
 	url = url.replace(/channel=[^&]*/, '').replace(/\?$/, '');
 	url += (url.indexOf('?') == -1)? '?' : '&';
-	url += 'channel=' + obj;
+	url += 'channel=' + channel;
 	var html = '';
 	html += 'Tell your friend to join this chat with this link:<br/>';
 	html += url;
@@ -137,13 +158,12 @@ function send(){
 	};
 	
 	var data = {};
-	data.obj = $('*[name=obj]').val();
+	data.cname = $('*[name=channel]').val();
 	data.content = JSON.stringify(msg);
 	data.content = JSON.stringify(data.content);
 	data.content = data.content.substr(1, data.content.length - 2);
 
 	$('button.send').attr('disabled', 'disabled');
-	var pub_url = 'http://' + app_host + '/pub?cb=?';
 	$.getJSON(pub_url, data, function(){
 		t.val('');
 		$('button.send').removeAttr('disabled');
@@ -154,12 +174,12 @@ $(function(){
 	var url = location.href;
 	var channel = url.match(/channel=[^&]*/);
 	if(channel != null){
-		var obj = channel[0].replace('channel=', '');
-		obj = obj.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+		var channel = channel[0].replace('channel=', '');
+		channel = channel.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 	}else{
-		var obj = random_str();
+		var channel = random_str();
 	}
-	$('*[name=obj]').val(obj);
+	$('*[name=channel]').val(channel);
 	$('*[name=nickname]').val(uid);
 });
 </script>
@@ -172,9 +192,12 @@ $(function(){
 		</tr>
 		<tr>
 			<td>Channel</td>
-			<td><input type="text" name="obj" size="28" value="abc" /></td>
+			<td>
+				<input type="text" name="channel" size="28" value="abc" />
+			</td>
 		</tr>
 	</table>
+	<p><a href="#" onclick="$('*[name=channel]').val('public'); return false;">Join the public channel with others</a></p>
 	<button onclick="join()">&nbsp;Join&nbsp;</button>
 </div>
 

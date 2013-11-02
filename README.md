@@ -3,14 +3,14 @@ icomet
 
 A C1000K comet server built with libevent
 
-## Supported OS and Browsers
+## Supported Platforms and Browsers
 
-| Browser | OS  |
-| --------| --- |
-| Safari | iPhone, Mac |
+| Browser | Platform |
+| --------| -------- |
+| Safari  | iOS(iPhone, iPod, iPad), Mac |
 | Firefox | Windows, Mac |
-| Chrome | Windows, Mac |
-| IE6 | Windows |
+| Chrome  | Windows, Mac |
+| IE6, IE8 | Windows |
 
 
 ## Usage
@@ -22,6 +22,20 @@ make
 curl -v "http://127.0.0.1:8100/sub?cid=12"
 # open another terminal
 curl -v "http://127.0.0.1:8000/pub?cid=12&content=hi"
+```
+
+### JavaScript Library Usage
+
+```javascript
+var comet = new iComet({
+	channel: 'abc',
+    signUrl: 'http://127.0.0.1:8000/sign',
+    subUrl: 'http://127.0.0.1:8100/sub',
+    callback: function(msg){
+        // on server push
+        alert(msg.content);
+    }
+});
 ```
 
 ## Memory Usage
