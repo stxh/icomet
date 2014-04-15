@@ -1,24 +1,19 @@
-#include "../config.h"
 #include "channel.h"
 #include <event2/buffer.h>
 #include <event2/keyvalq_struct.h>
 #include "util/log.h"
 #include "util/list.h"
 #include "server.h"
+#include "subscriber.h"
 #include "server_config.h"
 
 Channel::Channel(){
-	reset();
+	serv = NULL;
+	idle = 0;
+	seq_next = 0;
 }
 
 Channel::~Channel(){
-}
-
-void Channel::reset(){
-	seq_next = 0;
-	idle = -1;
-	token.clear();
-	msg_list.clear();
 }
 
 void Channel::add_subscriber(Subscriber *sub){
@@ -52,24 +47,23 @@ void Channel::create_token(){
 	token.resize(32);
 }
 
-void Channel::send(const char *type, const char *content){
-	struct evbuffer *buf = evbuffer_new();
+void Channel::clear(){
+	msg_list.clear();
+}
+
+void Channel::close(){
+	this->send("close", "");
 	LinkedList<Subscriber *>::Iterator it = subs.iterator();
 	while(Subscriber *sub = it.next()){
-		evbuffer_add_printf(buf,
-			"%s({type: \"%s\", cname: \"%s\", seq: \"%d\", content: \"%s\"});\n",
-			sub->callback.c_str(),
-			type,
-			this->name.c_str(),
-			this->seq_next,
-			content);
-		evhttp_send_reply_chunk(sub->req, buf);
-		evhttp_send_reply_end(sub->req);
-		//
-		evhttp_connection_set_closecb(sub->req->evcon, NULL, NULL);
-		sub->serv->sub_end(sub);
+		sub->close();
 	}
-	evbuffer_free(buf);
+}
+
+void Channel::send(const char *type, const char *content){
+	LinkedList<Subscriber *>::Iterator it = subs.iterator();
+	while(Subscriber *sub = it.next()){
+		sub->send_chunk(this->seq_next, type, content);
+	}
 
 	if(strcmp(type, "data") == 0){
 		msg_list.push_back(content);

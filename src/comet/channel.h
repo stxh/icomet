@@ -1,6 +1,7 @@
 #ifndef ICOMET_CHANNEL_H
 #define ICOMET_CHANNEL_H
 
+#include "../build.h"
 #include <string>
 #include <vector>
 #include <evhttp.h>
@@ -9,20 +10,8 @@
 #define CHANNEL_MSG_LIST_SIZE	10
 
 class Server;
-class Channel;
+class Subscriber;
 
-class Subscriber{
-public:
-	Subscriber *prev;
-	Subscriber *next;
-	
-	Server *serv;
-	Channel *channel;
-	std::string callback;
-	int idle;
-	int noop_seq;
-	struct evhttp_request *req;
-};
 
 class Channel{
 private:
@@ -43,9 +32,9 @@ public:
 	Channel *prev;
 	Channel *next;
 
+	Server *serv;
 	LinkedList<Subscriber *> subs;
 
-	int id;
 	// idle < 0: offline
 	// idle >= 0 && subs.empty(): away
 	// idle >= 0 && !subs.empty(): online
@@ -65,7 +54,6 @@ public:
 	
 	Channel();
 	~Channel();
-	void reset();
 	
 	inline int msg_seq_min() const{
 		if(msg_list.empty()){
@@ -80,7 +68,9 @@ public:
 	
 	void add_subscriber(Subscriber *sub);
 	void del_subscriber(Subscriber *sub);
-	void send( const char *type, const char *content);
+	void send(const char *type, const char *content);
+	void clear();
+	void close();
 };
 
 #endif

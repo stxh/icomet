@@ -1,0 +1,25 @@
+* 0.2.2.1 (2014-04-09)
+	* New features:
+		- Refactor source code
+	* Bug fixes:
+		- Fix memory leak bug, MUST call evhttp_send_reply_end in connection_closecb(2014-04-12)
+
+
+* 0.2.2 (2014-03-24)
+	* New features:
+		- Use new/delete instead of custom memory pool
+		- Deprecate Channel.id property
+	* Incompatible changes:
+		- Wrap json object property names in quotes(2014-04-07)
+	* Bug fixes:
+		- Fix bug on HttpQuery(evhttp_parse_query without evhttp_clear_headers)(2014-04-02)
+
+* 0.2.1 (2014-03-20)
+	* New features:
+		- Add web demos: long-polling.html forever-iframe.html
+	* Incompatible changes:
+		- The data type of seq in response is changed to int(previousely string)
+
+* 0.2.0 (2014-02-26)
+	Init this file.
+

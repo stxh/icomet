@@ -7,8 +7,9 @@ config = {
 	signUrl: 'http://...',
 	// sub_url link directly to icomet server
 	subUrl: 'http://...',
+	[pubUrl: 'http://...',]
 	// be called when receive a msg
-	callback: function(msg){}
+	callback: function(content){}
 };
 */
 function iComet(config){
@@ -17,10 +18,20 @@ function iComet(config){
 		iComet.id__ = 0;
 	}
 	config.sub_url = config.sub_url || config.subUrl;
+	config.pub_url = config.pub_url || config.pubUrl;
 	config.sign_url = config.sign_url || config.signUrl;
 	
 	self.cname = config.channel;
-	self.sub_cb = config.callback || config.sub_callback;
+	self.sub_cb = function(msg){
+		var cb = config.callback || config.sub_callback;
+		if(cb){
+			try{
+				cb(msg.content);
+			}catch(e){
+				self.log(e);
+			}
+		}
+	}
 	self.sub_timeout = config.sub_timeout || (60 * 1000);
 	
 	self.id = iComet.id__++;
@@ -36,6 +47,7 @@ function iComet(config){
 	self.noop_seq = 0;
 	self.sign_cb = null;
 	
+	self.pub_url = config.pub_url;
 	if(config.sub_url.indexOf('?') == -1){
 		self.sub_url = config.sub_url + '?';
 	}else{
@@ -86,7 +98,7 @@ function iComet(config){
 			return;
 		}
 		if(msg.type == '429'){
-			alert('too many connections');
+			//alert('too many connections');
 			self.log('resp', msg);
 			setTimeout(self_sub, 5000 + Math.random() * 5000);
 			return;
@@ -111,6 +123,7 @@ function iComet(config){
 				// so pause some seconds before sub again
 				setTimeout(self_sub, 1000 + Math.random() * 2000);
 			}else{
+				// we have created more than one connection, ignore it
 				self.log('ignore exceeded connections');
 			}
 			return;
@@ -121,17 +134,13 @@ function iComet(config){
 				if(msg.seq == 0){
 					self.log('server restarted');
 					// TODO: lost_cb(msg);
-					if(self.sub_cb){
-						self.sub_cb(msg);
-					}
+					self.sub_cb(msg);
 				}else if(msg.seq < self.data_seq){
 					self.log('drop', msg);
 				}else{
 					self.log('msg lost', msg);
 					// TODO: lost_cb(msg);
-					if(self.sub_cb){
-						self.sub_cb(msg);
-					}
+					self.sub_cb(msg);
 				}
 				
 				self.data_seq = msg.seq;
@@ -156,9 +165,7 @@ function iComet(config){
 				}else{
 					self.data_seq ++;
 				}
-				if(self.sub_cb){
-					self.sub_cb(msg);
-				}
+				self.sub_cb(msg);
 				if(!in_batch){
 					self_sub();
 				}
@@ -179,7 +186,7 @@ function iComet(config){
 	}
 
 	var self_sub = function(){
-		//self.log('sub');
+		self.log('sub');
 		self.stopped = false;
 		self.last_sub_time = (new Date()).getTime();
 		$('script.' + self.cb).remove();
@@ -218,7 +225,7 @@ function iComet(config){
 					self.token = msg.token;
 					try{
 						var a = parseInt(msg.sub_timeout) || 0;
-						self.sub_timeout = (a + 10) * 1000;
+						self.sub_timeout = (a * 1.2) * 1000;
 					}catch(e){}
 					self.log('start sub ' + self.cname + ', timeout=' + self.sub_timeout + 'ms');
 					self._start_timeout_checker();
@@ -233,9 +240,9 @@ function iComet(config){
 	}
 
 	self.stop = function(){
+		self.stopped = true;
 		self.last_sub_time = 0;
 		self.need_fast_reconnect = true;
-		self.stopped = true;
 		if(self.timer){
 			clearTimeout(self.timer);
 			self.timer = null;
@@ -258,6 +265,24 @@ function iComet(config){
 				self.start();
 			}
 		}, 1000);
+	}
+	
+	// msg must be string
+	self.pub = function(content, callback){
+		if(typeof(content) != 'string' || !self.pub_url){
+			alert(self.pub_url);
+			return false;
+		}
+		if(callback == undefined){
+			callback = function(){};
+		}
+		var data = {};
+		data.encoded = 1; // json_encoded without double quotes
+		data.cname = self.cname;
+		data.content = JSON.stringify(content);
+		data.content = data.content.substr(1, data.content.length - 2);
+
+		$.getJSON(self.pub_url, data, callback);
 	}
 	
 	self.log = function(){

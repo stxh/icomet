@@ -1,16 +1,25 @@
 $(shell sh build.sh 1>&2)
-include config.mk
+include build.mk
 
 .PHONY: all tools clean
 
 all:
-	cd util; make
-	cd comet; make
+	mkdir -p logs
+	cd src/util; make
+	cd src/comet; make
+	cp -f comet-server comet-server-`cat version`
 
 tools:
 	cd tools; make
 
 clean:
 	rm -f *.exe.stackdump
-	cd util; make clean
-	cd comet; make clean
+	cd src/util; make clean
+	cd src/comet; make clean
+	rm -f comet-server-*
+
+clean_all: clean
+	cd $(JEMALLOC_PATH); make clean
+	cd $(LIBEVENT_PATH); make clean
+	rm -f $(JEMALLOC_PATH)/Makefile $(LIBEVENT_PATH)/Makefile
+	

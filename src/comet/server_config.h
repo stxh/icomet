@@ -1,8 +1,10 @@
 #ifndef ICOMET_SERVER_CONFIG_H
 #define ICOMET_SERVER_CONFIG_H
 
+#include <string>
 #include "util/config.h"
 
+// initialized in comet-server.cpp
 class ServerConfig{
 public:
 	static int max_channels;
@@ -13,6 +15,14 @@ public:
 	static int channel_timeout;
 	// rename max_channel_idles
 	static int channel_idles; // max idle count to offline
+	
+	/*
+	static std::string iframe_header;
+	static std::string iframe_chunk_prefix;
+	static std::string iframe_chunk_suffix;
+	*/
+	
+	//int load(Config *conf);
 };
 
 #endif
